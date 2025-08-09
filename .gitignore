@@ -31,8 +31,6 @@ dist-ssr
 .env.production.local
 
 # Data files (but allow public data)
-*.xlsx
 *.xls
 *.csv
-!public/*.xlsx
 !public/*.xls

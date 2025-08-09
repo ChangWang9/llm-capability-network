@@ -1,7 +1,7 @@
+// src/composables/useDataProcessor.js
 import { ref } from 'vue'
 import * as XLSX from 'xlsx'
 import { useDataStore } from '@/stores/dataStore'
-import { parseCapabilitiesString, cleanCapabilityName } from '@/utils/dataProcessor'
 
 export function useDataProcessor() {
   const dataStore = useDataStore()
@@ -28,8 +28,8 @@ export function useDataProcessor() {
     dataStore.setLoading(true, '正在加载默认数据...')
     
     try {
-      // 尝试加载默认数据文件 - 修改路径
-      const response = await fetch('/data6.xlsx')  // Vite 会自动从 public 目录提供文件
+      // 尝试加载默认数据文件
+      const response = await fetch('/Edges_cleaned_updated_with_datasets_final_v4.xlsx')
       if (!response.ok) {
         throw new Error('默认数据文件不存在')
       }
@@ -75,57 +75,158 @@ export function useDataProcessor() {
   const processCapabilityData = (data) => {
     const capabilityStats = {}
     const paperCapabilityMap = {}
-    const capabilityPairMap = {}
+    const edges = []
+    const capabilityUrls = {} // 存储每个能力对应的URL
 
-    data.forEach((row) => {
-      const paperName = row['Papers']
-      const mergedCapabilities = row['merged_capabilities']
+    let edgeProcessedCount = 0
+
+    // 能力名称标准化函数
+    const normalizeCapabilityName = (name) => {
+      if (!name) return ''
+      return name.toString().trim().toLowerCase()
+        .replace(/['"]/g, '') // 移除引号
+        .replace(/\s+/g, ' ') // 合并多个空格
+        .replace(/capability$/, '') // 移除末尾的capability
+        .trim()
+    }
+    
+    data.forEach((row, index) => {
+      const paperName = row['paper_name'] || row['actual_file_name']
+      const url = row['url']
+      const capabilitiesStr = row['capability']
+      const edgesStr = row['Edges']
       
-      if (mergedCapabilities && typeof mergedCapabilities === 'string') {
+      // 解析能力列表
+      let capabilities = []
+      if (capabilitiesStr && typeof capabilitiesStr === 'string') {
         try {
-          const capabilities = parseCapabilitiesString(mergedCapabilities)
+          if (capabilitiesStr.startsWith('[') && capabilitiesStr.endsWith(']')) {
+            capabilities = JSON.parse(capabilitiesStr.replace(/'/g, '"'))
+          } else {
+            capabilities = [capabilitiesStr]
+          }
+        } catch (e) {
+          console.log('解析能力列表错误:', e)
+          capabilities = [capabilitiesStr]
+        }
+      }
+      
+      // 统计能力并记录论文和URL
+      capabilities.forEach(cap => {
+        if (cap && cap.trim()) {
+          const cleanCap = normalizeCapabilityName(cap)
+          if (!cleanCap) return
           
-          // 统计单个能力
-          capabilities.forEach(cap => {
-            if (cap && cap.trim()) {
-              const cleanCap = cleanCapabilityName(cap)
-              capabilityStats[cleanCap] = (capabilityStats[cleanCap] || 0) + 1
-              
-              if (!paperCapabilityMap[cleanCap]) {
-                paperCapabilityMap[cleanCap] = []
-              }
-              if (paperName && !paperCapabilityMap[cleanCap].includes(paperName)) {
-                paperCapabilityMap[cleanCap].push(paperName)
+          // 统计能力出现次数
+          capabilityStats[cleanCap] = (capabilityStats[cleanCap] || 0) + 1
+          
+          // 记录能力对应的论文和URL
+          if (!paperCapabilityMap[cleanCap]) {
+            paperCapabilityMap[cleanCap] = []
+          }
+          if (paperName && !paperCapabilityMap[cleanCap].some(p => p.name === paperName)) {
+            paperCapabilityMap[cleanCap].push({
+              name: paperName,
+              url: url || null
+            })
+          }
+          
+          // 保存能力的URL（如果存在）
+          if (url && !capabilityUrls[cleanCap]) {
+            capabilityUrls[cleanCap] = url
+          }
+        }
+      })
+      
+      // 解析有向边
+      if (edgesStr && typeof edgesStr === 'string') {
+        edgeProcessedCount++
+        
+        try {
+          let edgesList = []
+          if (edgesStr.startsWith('[') && edgesStr.endsWith(']')) {
+            // 处理嵌套数组格式 [['A', 'B'], ['C', 'D']]
+            const cleanStr = edgesStr.replace(/'/g, '"')
+            edgesList = JSON.parse(cleanStr)
+          } else {
+            // 如果不是数组格式，尝试其他解析方式
+            const parts = edgesStr.split(',').map(s => s.trim())
+            if (parts.length >= 2) {
+              edgesList = [[parts[0], parts[1]]]
+            }
+          }
+          
+          edgesList.forEach(edge => {
+            if (Array.isArray(edge) && edge.length === 2) {
+              const [source, target] = edge
+              if (source && target) {
+                const normalizedSource = normalizeCapabilityName(source)
+                const normalizedTarget = normalizeCapabilityName(target)
+                
+                if (normalizedSource && normalizedTarget && normalizedSource !== normalizedTarget) {
+                  edges.push({
+                    source: normalizedSource,
+                    target: normalizedTarget,
+                    paper: paperName,
+                    url: url || null
+                  })
+                }
               }
             }
           })
-          
-          // 统计能力对的共现
-          for (let i = 0; i < capabilities.length; i++) {
-            for (let j = i + 1; j < capabilities.length; j++) {
-              const cap1 = cleanCapabilityName(capabilities[i])
-              const cap2 = cleanCapabilityName(capabilities[j])
-              if (cap1 && cap2) {
-                const pairKey = [cap1, cap2].sort().join('|||')
-                if (!capabilityPairMap[pairKey]) {
-                  capabilityPairMap[pairKey] = []
-                }
-                if (paperName && !capabilityPairMap[pairKey].includes(paperName)) {
-                  capabilityPairMap[pairKey].push(paperName)
-                }
-              }
+        } catch (e) {
+          // 尝试简单的逗号分割
+          const parts = edgesStr.split(',').map(s => s.trim())
+          if (parts.length >= 2) {
+            const normalizedSource = normalizeCapabilityName(parts[0])
+            const normalizedTarget = normalizeCapabilityName(parts[1])
+            
+            if (normalizedSource && normalizedTarget && normalizedSource !== normalizedTarget) {
+              edges.push({
+                source: normalizedSource,
+                target: normalizedTarget,
+                paper: paperName,
+                url: url || null
+              })
             }
           }
-        } catch (e) {
-          console.log('解析错误:', e)
         }
       }
+    })
+
+    // 处理边的统计
+    const edgeMap = {}
+    edges.forEach(edge => {
+      const key = `${edge.source}|||${edge.target}`
+      if (!edgeMap[key]) {
+        edgeMap[key] = {
+          source: edge.source,
+          target: edge.target,
+          papers: []
+        }
+      }
+      if (edge.paper && !edgeMap[key].papers.some(p => p.name === edge.paper)) {
+        edgeMap[key].papers.push({
+          name: edge.paper,
+          url: edge.url
+        })
+      }
+    })
+
+    console.log('数据处理完成统计:', {
+      总行数: data.length,
+      有边数据的行数: edgeProcessedCount,
+      原始边数量: edges.length,
+      合并后边数量: Object.values(edgeMap).length,
+      能力数量: Object.keys(capabilityStats).length,
+      示例边: Object.values(edgeMap).slice(0, 3)
     })
 
     return {
       capabilityStats,
       paperCapabilityMap,
-      capabilityPairMap
+      edges: Object.values(edgeMap),
+      capabilityUrls
     }
   }
 

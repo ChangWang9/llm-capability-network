@@ -1,35 +1,64 @@
-@import './variables.css';
+/* 添加到 src/assets/styles/components.css */
 
-/* 侧边栏样式 */
-.sidebar {
-  width: var(--sidebar-width);
-  background: var(--sidebar-bg);
-  backdrop-filter: blur(10px);
-  padding: var(--spacing-lg);
-  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
-  overflow-y: auto;
-  transition: all var(--transition-normal);
+/* 可交互悬浮框的额外样式 */
+.tooltip.interactive {
+  user-select: text;
+  cursor: default;
 }
 
-/* 主内容区域 */
-.main-content {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
+.tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
 }
 
-/* 更多组件样式... */
-.section {
-  margin-bottom: 25px;
+.tooltip-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
-.section-title {
-  font-size: 1.1em;
-  font-weight: 600;
-  margin-bottom: 15px;
-  color: var(--primary-color);
+.tooltip-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
 }
 
-.hidden {
-  display: none !important;
+.paper-link {
+  color: var(--secondary-color);
+  text-decoration: none;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.paper-link:hover {
+  color: #fb923c; /* 能量橙 hover 较亮 */
+  text-decoration: underline;
+}
+
+/* 有向图的边样式 */
+.network-container line {
+  stroke-linecap: round;
+}
+
+/* 箭头样式 */
+.network-container marker path {
+  transition: fill 0.3s, opacity 0.3s;
+}
+
+.network-container line:hover + marker path {
+  fill: var(--primary-color);
+  opacity: 1;
 }

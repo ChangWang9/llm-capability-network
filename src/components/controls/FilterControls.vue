@@ -1,6 +1,21 @@
 <template>
     <div class="filter-controls">
       <div class="control-group">
+        <label class="control-label">逐步展开模式</label>
+        <div class="button-group">
+          <label style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" v-model="explorationMode" @change="handleExplorationModeChange" />
+            <span>{{ explorationMode ? '开启' : '关闭' }}</span>
+          </label>
+          <button 
+            class="control-btn"
+            v-if="explorationMode"
+            @click="resetExpansion"
+          >重置展开</button>
+        </div>
+      </div>
+
+      <div class="control-group">
         <label class="control-label">
           最小连接数: <span class="control-value">{{ minConnections }}</span>
         </label>
@@ -38,6 +53,11 @@
   
   const emit = defineEmits(['filters-changed'])
   
+  const explorationMode = computed({
+    get: () => networkStore.explorationMode,
+    set: (value) => networkStore.setExplorationMode(value)
+  })
+
   const minConnections = computed({
     get: () => networkStore.minConnections,
     set: (value) => {
@@ -52,6 +72,15 @@
     }
   })
   
+  const handleExplorationModeChange = () => {
+    emit('filters-changed')
+  }
+
+  const resetExpansion = () => {
+    networkStore.setExpandedNodes([])
+    emit('filters-changed')
+  }
+
   const handleConnectionsChange = () => {
     emit('filters-changed')
   }
@@ -80,6 +109,26 @@
   .control-value {
     color: var(--primary-color);
     font-weight: 600;
+  }
+
+  .button-group { 
+    display: flex; 
+    gap: var(--spacing-xs);
+  }
+
+  .control-btn {
+    background: var(--card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all var(--transition-normal);
+  }
+
+  .control-btn:hover {
+    background: var(--card-bg-hover);
   }
   
   .slider {
